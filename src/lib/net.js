@@ -1,6 +1,6 @@
 // One shared connection to your server for matchmaking, leaderboard and teams.
-const KEY = "signquest-id";
-export const myId = localStorage.getItem(KEY) || (localStorage.setItem(KEY, crypto.randomUUID()), localStorage.getItem(KEY));
+export let myId = "guest"; // App.jsx sets this to the logged-in username
+export const setMyId = (id) => { myId = id; };
 let ws, queue = [];
 const handlers = new Set();
 

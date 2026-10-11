@@ -246,3 +246,10 @@ p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+.plate { display:inline-flex; width:34px; height:34px; border-radius:50%; align-items:center; justify-content:center; border:2px dashed #555; color:#555; flex:none; }
+.plate.gold { border:2px solid var(--gold); color:#4a3300; background:radial-gradient(circle at 30% 30%,#fff3b0,#ffd24a 45%,#b8860b); box-shadow:0 0 12px var(--gold); }
+.overlay { position:fixed; inset:0; z-index:10; background:#000c; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
+.plate-big { width:220px; height:220px; border-radius:50%; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; font:800 20px Cinzel,serif; color:#4a3300; background:radial-gradient(circle at 30% 30%,#fff3b0,#ffd24a 40%,#b8860b 75%,#7a5a00); box-shadow:0 0 40px #ffd24a, 0 0 90px #ffb800aa, inset 0 0 20px #fff6; animation:plateIn 1.2s cubic-bezier(.2,1.4,.4,1) both; }
+.plate-big::after { content:""; position:absolute; inset:0; background:linear-gradient(110deg,transparent 35%,#fffb 50%,transparent 65%); transform:translateX(-120%); animation:shine 1.6s .8s ease-in-out infinite; }
+@keyframes plateIn { from { transform:scale(.2) rotateY(180deg); opacity:0; } to { transform:scale(1) rotateY(0); opacity:1; } }
+@keyframes shine { to { transform:translateX(120%); } }

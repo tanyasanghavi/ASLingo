@@ -2,6 +2,7 @@
 import express from "express";
 import http from "http";
 import { WebSocketServer } from "ws";
+import { loadPlayers, savePlayers } from "./persist.js";
 
 const app = express();
 app.use(express.json());
@@ -19,16 +20,20 @@ async function ask(prompt) {
   return text.trim();
 }
 
+// Live coaching while the camera is on: says what you are signing, then the one fix to make.
 app.post("/api/coach", async (req, res) => {
-  const { sign, score, mistakes = [], f = {} } = req.body;
+  const { sign, score, mistakes = [], f = {}, detected = [] } = req.body;
+  const seen = detected.length ? detected.map((d) => `${d.kind} ${d.sign}`).join(" or ") : "no clear sign";
   try {
     res.json({ tip: await ask(`You are a friendly wizard coaching ASL fingerspelling.
-Letter: ${sign}. Score: ${score}/100. Measured problems: ${mistakes.join("; ") || "none"}.
+The learner is practicing ${sign} (score ${score}/100). The camera thinks they are signing: ${seen}.
+Measured problems: ${mistakes.join("; ") || "none"}.
 Palm faces: ${f.palm}. Hand position: ${f.location}. Motion: ${f.motion}. Eyebrows: ${f.face?.brows || "unknown"}.
-Reply with ONE short sentence (max 15 words) saying exactly what to fix. Use only the measured problems. If none, give a short compliment.`) });
+Reply with 2 short sentences. Sentence 1 must start with "You are signing the letter X" (say "number" for digits; if several signs look the same say "You may be signing X or Y"; if there is no clear sign say "I can't tell what you are signing yet"). Sentence 2: the one fix to make for ${sign}, or a short compliment if there are no problems. Use only the information above.`) });
   } catch (e) { console.error(e.message); res.json({ tip: mistakes[0] || "Keep going, you're close!" }); }
 });
 
+// Session summary for the Progress tab.
 app.post("/api/summary", async (req, res) => {
   const { name, session } = req.body;
   try {
@@ -38,9 +43,9 @@ Use only this data: ${JSON.stringify(session.signs)}. Session length: ${session.
   } catch (e) { console.error(e.message); res.json({ summary: "Great work today! Review your weakest letter tomorrow." }); }
 });
 
-// ---------- Online play. Everything lives in memory and resets when the server restarts. ----------
-const players = new Map(); // player id -> { name, points, team }
-let waiting = null;        // the socket that is waiting for an opponent
+// ---------- Online play. Players and teams are saved to players.json so they survive restarts. ----------
+const players = loadPlayers(); // players and teams saved from earlier runs
+let waiting = null;            // the socket that is waiting for an opponent
 const pickOne = (a) => a[Math.floor(Math.random() * a.length)];
 const out = (ws, m) => ws && ws.readyState === 1 && ws.send(JSON.stringify(m));
 const teamNames = () => [...new Set([...players.values()].map((p) => p.team).filter(Boolean))];
@@ -59,14 +64,18 @@ const wss = new WebSocketServer({ server, path: "/ws" });
 wss.on("connection", (ws) => {
   ws.on("message", (raw) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
-    if (m.type === "hello") {
+
+    if (m.type === "hello") { // a player introduces themselves (and updates their points)
       ws.pid = m.id;
       players.set(m.id, { team: null, ...players.get(m.id), name: String(m.name).slice(0, 20), points: m.points || 0 });
+      savePlayers(players);
       out(ws, { type: "team", team: teamInfo(players.get(m.id).team) });
       return;
     }
+
     const me = players.get(ws.pid);
     if (!me) return;
+
     if (m.type === "find" && Array.isArray(m.signs) && m.signs.length) {
       leave(ws);
       if (waiting && waiting !== ws) { // someone is waiting, so pair up
@@ -77,17 +86,25 @@ wss.on("connection", (ws) => {
         out(b, { type: "matched", opponent: players.get(a.pid)?.name || "Player", targets });
       } else waiting = ws;
     }
+
     if (m.type === "leave") leave(ws);
     if (m.type === "score") out(ws.opp, { type: "opp", total: m.total, done: m.done });
+
     if (m.type === "board") {
       out(ws, { type: "board",
         players: [...players.entries()].map(([id, p]) => ({ id, name: p.name, points: p.points })).sort((a, b) => b.points - a.points).slice(0, 10),
         teams: teamNames().map(teamInfo).sort((a, b) => b.points - a.points).slice(0, 5) });
     }
-    if (m.type === "createTeam") { me.team = String(m.name || "").trim().slice(0, 20) || me.team; out(ws, { type: "team", team: teamInfo(me.team) }); }
+
+    if (m.type === "createTeam") {
+      me.team = String(m.name || "").trim().slice(0, 20) || me.team;
+      savePlayers(players);
+      out(ws, { type: "team", team: teamInfo(me.team) });
+    }
     if (m.type === "randomTeam") {
       const open = teamNames().filter((t) => teamInfo(t).members.length < 4);
       me.team = open.length ? pickOne(open) : "Wizard Squad " + (100 + Math.floor(Math.random() * 900));
+      savePlayers(players);
       out(ws, { type: "team", team: teamInfo(me.team) });
     }
   });

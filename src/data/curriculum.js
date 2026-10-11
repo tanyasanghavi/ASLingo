@@ -1,38 +1,44 @@
-// The learning path. "minLevel" decides which units are unlocked for a new player.
-export const LEVEL_RANK = { beginner: 0, some: 1, advanced: 2 }
+// What each handshape should look like. 1 = finger extended (index, middle, ring, pinky).
+const RAW = {
+  A: { fingers: [0, 0, 0, 0], thumbTucked: false, together: false },
+  B: { fingers: [1, 1, 1, 1], thumbTucked: true, together: true },
+  I: { fingers: [0, 0, 0, 1], thumbTucked: true, together: false },
+  L: { fingers: [1, 0, 0, 0], thumbTucked: false, together: false },
+  Y: { fingers: [0, 0, 0, 1], thumbTucked: false, together: false },
+  // Numbers 1-5. Palm direction varies by source, so palm: null means it is not checked.
+  "1": { fingers: [1, 0, 0, 0], thumbTucked: true, together: false, palm: null },
+  "2": { fingers: [1, 1, 0, 0], thumbTucked: true, together: false, palm: null },
+  "3": { fingers: [1, 1, 0, 0], thumbTucked: false, together: false, palm: null },
+  "4": { fingers: [1, 1, 1, 1], thumbTucked: true, together: false, palm: null },
+  "5": { fingers: [1, 1, 1, 1], thumbTucked: false, together: false, palm: null },
+};
+// Most fingerspelling letters face the palm toward the viewer. Check each against a reference.
+export const SIGNS = Object.fromEntries(Object.entries(RAW).map(([k, v]) => [k, { palm: "camera", ...v }]));
 
-export const UNITS = [
-  {
-    id: 'alphabet',
-    title: 'Alphabet',
-    blurb: 'Fingerspell A to Z',
-    minLevel: 'beginner',
-    lessons: ['A-E', 'F-J', 'K-O', 'P-T', 'U-Z'],
-  },
-  {
-    id: 'numbers',
-    title: 'Numbers',
-    blurb: 'Count from 0 to 9',
-    minLevel: 'beginner',
-    lessons: ['0-3', '4-6', '7-9'],
-  },
-  {
-    id: 'words',
-    title: 'Words',
-    blurb: 'Greetings and everyday words',
-    minLevel: 'some',
-    lessons: ['Hello and bye', 'Family', 'Food', 'Feelings'],
-  },
-  {
-    id: 'sentences',
-    title: 'Sentences',
-    blurb: 'Full conversations',
-    minLevel: 'advanced',
-    lessons: ['Introduce yourself', 'Ask a question', 'Small talk'],
-  },
-]
+// Lessons, in order. To add a letter, add it to RAW above and to LETTERS (keep ABC order).
+export const LETTERS = ["A", "B", "I", "L", "Y"];
+export const NUMBERS = ["1", "2", "3", "4", "5"];
+export const LESSONS = [...LETTERS, ...NUMBERS]; // used by the games
 
-export const isUnitUnlocked = (unit, level) =>
-  LEVEL_RANK[level ?? 'beginner'] >= LEVEL_RANK[unit.minLevel]
+export const SECTIONS = [["letters", "Letters"], ["numbers", "Numbers"], ["words", "Words"], ["sentences", "Sentences"]];
+// Word and sentence lessons need recorded motion demos, so these are names only for now.
+export const WORDS = {
+  Nouns: ["Water", "Mom", "Dad", "Home"],
+  Verbs: ["Eat", "Drink", "Help", "Learn"],
+  Adjectives: ["Happy", "Sad", "Big", "Small"],
+  Other: ["Hello", "Please", "Thank you", "Yes", "No"],
+};
+export const SENTENCES = ["Hello, my name is...", "Where is the bathroom?", "I am happy"];
 
-export const lessonId = (unit, i) => `${unit.id}-${i}`
+// Turns a sign's data into plain instructions.
+export function describe(sign) {
+  const t = SIGNS[sign], n = ["index", "middle", "ring", "pinky"];
+  const up = n.filter((_, i) => t.fingers[i]), down = n.filter((_, i) => !t.fingers[i]);
+  const parts = [];
+  if (up.length) parts.push(`Straighten your ${up.join(", ")} ${up.length > 1 ? "fingers" : "finger"}.`);
+  if (down.length) parts.push(`Curl your ${down.join(", ")} ${down.length > 1 ? "fingers" : "finger"} into your palm.`);
+  parts.push(t.thumbTucked ? "Tuck your thumb across your palm." : "Hold your thumb out to the side.");
+  if (t.together && up.length > 1) parts.push("Keep your fingers pressed together.");
+  if (t.palm) parts.push("Your palm faces the camera.");
+  return parts.join(" ");
+}
